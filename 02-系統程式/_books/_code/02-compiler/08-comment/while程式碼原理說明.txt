@@ -1,0 +1,5 @@
+這份 while 處理程式碼的設計原理，主要環繞著控制流(Control Flow)自動轉向。在編譯器中，這透過「標記（Label）」與「跳轉（Jump）」指令的組合來實現。一個 while (cond) { body } 的編譯結果邏輯如下：
+1.位址 A (L_BEGIN)：計算 cond。
+2.位址 B：JMP_F（若 cond 為假，跳到 位址 D）。
+3.位址 C：執行 body 的代碼，結尾補上 JUMP 到 位址 A。
+4.位址 D (L_END)：迴圈外的下一條指令。
