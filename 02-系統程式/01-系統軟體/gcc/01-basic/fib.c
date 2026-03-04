@@ -1,4 +1,4 @@
-int fib(int n)
+cargo --versionint fib(int n)
 {
   if (n == 0)
     return 0;
