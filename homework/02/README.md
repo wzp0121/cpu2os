@@ -1,4 +1,5 @@
 # Nova 程式語言 — 完整設計文件
+使用claude https://claude.ai/chat/46d1c112-8ee1-4c7e-a7ab-b0c6ba42c285
 
 ## 語言設計概覽
 
