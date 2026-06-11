@@ -1,0 +1,88 @@
+(* ============================================================
+   Nova Language — EBNF Grammar v1.0
+   ============================================================ *)
+
+(* --- Top Level --- *)
+program       = { top_decl } EOF ;
+
+top_decl      = fn_decl
+              | struct_decl
+              | let_stmt ;        (* module-level constant *)
+
+(* --- Function Declaration --- *)
+fn_decl       = "fn" IDENT "(" [ param_list ] ")" [ "->" type ] ":" NEWLINE
+                    INDENT { stmt } DEDENT ;
+
+param_list    = param { "," param } ;
+param         = IDENT ":" type ;
+
+(* --- Struct Declaration --- *)
+struct_decl   = "struct" IDENT ":" NEWLINE
+                    INDENT { field_decl } DEDENT ;
+
+field_decl    = IDENT ":" type NEWLINE ;
+
+(* --- Statements --- *)
+stmt          = let_stmt
+              | assign_stmt
+              | if_stmt
+              | while_stmt
+              | for_stmt
+              | return_stmt
+              | expr_stmt ;
+
+let_stmt      = "let" IDENT [ ":" type ] "=" expr NEWLINE ;
+assign_stmt   = IDENT { "." IDENT | "[" expr "]" } "=" expr NEWLINE ;
+if_stmt       = "if" expr ":" NEWLINE INDENT { stmt } DEDENT
+                { "elif" expr ":" NEWLINE INDENT { stmt } DEDENT }
+                [ "else" ":" NEWLINE INDENT { stmt } DEDENT ] ;
+while_stmt    = "while" expr ":" NEWLINE INDENT { stmt } DEDENT ;
+for_stmt      = "for" IDENT "in" expr ":" NEWLINE INDENT { stmt } DEDENT ;
+return_stmt   = "return" [ expr ] NEWLINE ;
+expr_stmt     = expr NEWLINE ;
+
+(* --- Expressions (precedence low -> high) --- *)
+expr          = or_expr ;
+or_expr       = and_expr { "or" and_expr } ;
+and_expr      = not_expr { "and" not_expr } ;
+not_expr      = [ "not" ] cmp_expr ;
+cmp_expr      = add_expr { ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) add_expr } ;
+add_expr      = mul_expr { ( "+" | "-" ) mul_expr } ;
+mul_expr      = unary_expr { ( "*" | "/" | "%" ) unary_expr } ;
+unary_expr    = [ "-" ] cast_expr ;
+cast_expr     = primary { "as" type } ;          (* explicit cast *)
+primary       = INT_LIT
+              | FLOAT_LIT
+              | BOOL_LIT
+              | STR_LIT
+              | IDENT [ call_suffix | field_suffix | index_suffix ]
+              | "[" [ expr { "," expr } ] "]"    (* array literal *)
+              | "(" expr ")"
+              | "(" expr { "," expr } ")" ;      (* tuple literal *)
+
+call_suffix   = "(" [ expr { "," expr } ] ")" ;
+field_suffix  = "." IDENT ;
+index_suffix  = "[" expr "]" ;
+
+(* --- Types --- *)
+type          = "int"
+              | "float"
+              | "bool"
+              | "str"
+              | "void"
+              | "array" "[" type "]"
+              | "tuple" "(" type { "," type } ")"
+              | "fn" "(" [ type { "," type } ] ")" "->" type
+              | IDENT ;                          (* struct name *)
+
+(* --- Terminals --- *)
+INT_LIT       = DIGIT { DIGIT } ;
+FLOAT_LIT     = DIGIT { DIGIT } "." DIGIT { DIGIT } ;
+BOOL_LIT      = "true" | "false" ;
+STR_LIT       = '"' { char } '"' ;
+IDENT         = LETTER { LETTER | DIGIT | "_" } ;
+NEWLINE       = "\n" ;
+INDENT        = (* increase indentation level *) ;
+DEDENT        = (* decrease indentation level *) ;
+DIGIT         = "0" | ... | "9" ;
+LETTER        = "a" | ... | "z" | "A" | ... | "Z" | "_" ;

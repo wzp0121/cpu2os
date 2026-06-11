@@ -1,0 +1,78 @@
+# ============================================================
+# Nova Language — 範例程式集
+# ============================================================
+
+# --- 範例 1: Hello World & 基本運算 ---
+fn main() -> void:
+    let msg: str = "Hello, Nova!"
+    print(msg)
+
+    let x: int = 10
+    let y: int = 3
+    let sum: int = x + y
+    let ratio: float = x as float / y as float   # 明確轉型
+    print(sum)
+    print(ratio)
+
+
+# --- 範例 2: 費氏數列（遞迴）---
+fn fib(n: int) -> int:
+    if n <= 1:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+fn main() -> void:
+    let i: int = 0
+    while i < 10:
+        print(fib(i))
+        i = i + 1
+
+
+# --- 範例 3: 陣列與 for 迴圈 ---
+fn sum_array(arr: array[int]) -> int:
+    let total: int = 0
+    for item in arr:
+        total = total + item
+    return total
+
+fn main() -> void:
+    let nums: array[int] = [1, 2, 3, 4, 5]
+    let result: int = sum_array(nums)
+    print(result)   # 15
+
+
+# --- 範例 4: 結構體 ---
+struct Point:
+    x: float
+    y: float
+
+fn distance(a: Point, b: Point) -> float:
+    let dx: float = a.x - b.x
+    let dy: float = a.y - b.y
+    return (dx * dx + dy * dy) as float   # 簡化：無 sqrt
+
+fn main() -> void:
+    let p1: Point = Point(0.0, 0.0)
+    let p2: Point = Point(3.0, 4.0)
+    let d: float = distance(p1, p2)
+    print(d)   # 25.0 (squared)
+
+
+# --- 範例 5: 型態錯誤示範（會在編譯期被攔截）---
+fn bad_example() -> void:
+    let x: int = 3.14       # ERROR: 型態不符，float 無法賦值給 int
+    let y: int = 1
+    let z: float = y + 1.0  # ERROR: int + float 需要明確轉型
+    # 正確寫法: let z: float = y as float + 1.0
+
+
+# --- 範例 6: 高階函數（函數型態）---
+fn apply(f: fn(int) -> int, val: int) -> int:
+    return f(val)
+
+fn double(x: int) -> int:
+    return x * 2
+
+fn main() -> void:
+    let result: int = apply(double, 5)
+    print(result)   # 10
