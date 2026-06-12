@@ -1,117 +1,107 @@
 import asyncio
-from blessed import Terminal
-from colorama import init as colorama_init
+import sys
+from flask import Flask, jsonify, request, render_template
 from config import *
 from map_generator import MapGenerator
 from ai_service import AIService
 from game_engine import GameEngine
 
-colorama_init()
+app = Flask(__name__)
 
-async def main():
-    term = Terminal()
-    ai = AIService()
-    engine = GameEngine(ai)
-    gen = MapGenerator(MAP_WIDTH, MAP_HEIGHT)
-    
-    engine.new_level(gen)
+ai = AIService()
+engine = GameEngine(ai)
+gen = MapGenerator(MAP_WIDTH, MAP_HEIGHT)
+engine.new_level(gen)
 
-    with term.fullscreen(), term.cbreak(), term.hidden_cursor():
-        print(term.clear)
-        
-        while True:
-            # --- 繪製畫面 ---
-            draw_screen(term, engine)
-            
-            # --- 處理輸入 ---
-            key = term.inkey(timeout=0.1)
-            
-            if key.code == term.KEY_ESCAPE or key == 'q':
-                break
-                
-            if engine.state == "EXPLORE":
-                res = None
-                if key.code == term.KEY_UP or key == 'w':
-                    res = await engine.move_player(0, -1)
-                elif key.code == term.KEY_DOWN or key == 's':
-                    res = await engine.move_player(0, 1)
-                elif key.code == term.KEY_LEFT or key == 'a':
-                    res = await engine.move_player(-1, 0)
-                elif key.code == term.KEY_RIGHT or key == 'd':
-                    res = await engine.move_player(1, 0)
-                
-                if res == "NEXT_LEVEL":
-                    engine.new_level(gen)
-                    print(term.clear)
 
-            elif engine.state == "BATTLE":
-                if key == '1': engine.handle_battle_action("ATTACK")
-                elif key == '2': engine.handle_battle_action("DEFEND")
-                elif key == '3': engine.handle_battle_action("POTION")
+def get_map_with_entities():
+    if engine.map_data is None:
+        return []
+    display_map = [list(row) for row in engine.map_data]
+    display_map[engine.player.y][engine.player.x] = PLAYER
+    sx, sy = engine.stairs
+    display_map[sy][sx] = STAIRS
+    for m in engine.monsters:
+        if m.is_alive():
+            display_map[m.y][m.x] = MONSTER
+    for c in engine.chests:
+        display_map[c.y][c.x] = CHEST
+    return [''.join(row) for row in display_map]
 
-            elif engine.state == "EVENT":
-                if key.upper() == 'A': engine.handle_event_choice("A")
-                elif key.upper() == 'B': engine.handle_event_choice("B")
 
-            elif engine.state == "GAMEOVER":
-                if key: break
-
-            await asyncio.sleep(0.01)
-
-def draw_screen(term, engine):
-    # 1. 繪製地圖
-    if engine.state == "EXPLORE":
-        for y, row in enumerate(engine.map_data):
-            for x, cell in enumerate(row):
-                char = cell
-                # 覆蓋顯示實體
-                if x == engine.player.x and y == engine.player.y: char = PLAYER
-                elif x == engine.stairs[0] and y == engine.stairs[1]: char = STAIRS
-                else:
-                    for m in engine.monsters:
-                        if m.x == x and m.y == y and m.is_alive():
-                            char = MONSTER
-                            break
-                    for c in engine.chests:
-                        if c.x == x and c.y == y:
-                            char = CHEST
-                            break
-                
-                print(term.move_xy(x, y) + COLORS.get(char, "") + char)
-    
-    # 2. 繪製狀態欄
+def get_game_state():
     p = engine.player
-    status = f" LV: {engine.level} | HP: {p.hp}/{p.max_hp} | ATK: {p.atk} | Potion: {p.potions} "
-    print(term.move_xy(0, MAP_HEIGHT + 1) + Style.RESET_ALL + "═" * MAP_WIDTH)
-    print(term.move_xy(0, MAP_HEIGHT + 2) + status)
-    
-    # 3. 繪製日誌
-    for i, log in enumerate(engine.logs):
-        print(term.move_xy(0, MAP_HEIGHT + 4 + i) + term.clear_eol + " > " + log)
-
-    # 4. 繪製模式視窗
-    if engine.state == "BATTLE":
+    weapon_desc = f"{p.weapon.name}(+{p.weapon.atk_bonus})" if p.weapon else "無"
+    armor_desc = f"{p.armor.name}(+{p.armor.def_bonus})" if p.armor else "無"
+    state = {
+        "state": engine.state,
+        "level": engine.level,
+        "map": get_map_with_entities(),
+        "player": {
+            "name": p.name,
+            "hp": p.hp,
+            "max_hp": p.max_hp,
+            "total_atk": p.total_atk,
+            "defense": p.defense,
+            "weapon": weapon_desc,
+            "armor": armor_desc,
+            "potions": p.potions,
+        },
+        "logs": list(engine.logs),
+    }
+    if engine.state == "BATTLE" and engine.current_battle_enemy:
         m = engine.current_battle_enemy
-        box_y = 2
-        print(term.move_xy(MAP_WIDTH + 4, box_y) + Fore.RED + f"【 戰鬥模式: {m.name} 】")
-        print(term.move_xy(MAP_WIDTH + 4, box_y + 1) + f" 敵方 HP: {m.hp}/{m.max_hp}")
-        print(term.move_xy(MAP_WIDTH + 4, box_y + 3) + Fore.YELLOW + f" AI 怪物挑釁: ")
-        print(term.move_xy(MAP_WIDTH + 4, box_y + 4) + f"「{engine.battle_dialogue}」")
-        print(term.move_xy(MAP_WIDTH + 4, box_y + 6) + Fore.WHITE + " 1. 攻擊  2. 防禦  3. 藥水")
-    
-    elif engine.state == "EVENT":
-        box_y = 2
-        print(term.move_xy(MAP_WIDTH + 4, box_y) + Fore.MAGENTA + "【 神祕事件 】")
-        print(term.move_xy(MAP_WIDTH + 4, box_y + 2) + engine.event_desc)
-        print(term.move_xy(MAP_WIDTH + 4, box_y + 5) + Fore.YELLOW + f" A. {engine.opt_a}")
-        print(term.move_xy(MAP_WIDTH + 4, box_y + 6) + Fore.YELLOW + f" B. {engine.opt_b}")
+        state["battle"] = {
+            "name": m.name,
+            "hp": m.hp,
+            "max_hp": m.max_hp,
+            "dialogue": engine.battle_dialogue,
+        }
+    if engine.state == "EVENT":
+        state["event"] = {
+            "desc": engine.event_desc,
+            "opt_a": engine.opt_a,
+            "opt_b": engine.opt_b,
+        }
+    return state
 
-    elif engine.state == "GAMEOVER":
-        print(term.move_xy(MAP_WIDTH // 2 - 5, MAP_HEIGHT // 2) + Fore.RED + Style.BRIGHT + " GAME OVER ")
-        print(term.move_xy(MAP_WIDTH // 2 - 8, MAP_HEIGHT // 2 + 1) + "按任意鍵退出...")
 
-if __name__ == "__main__":
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/api/state')
+def api_state():
+    return jsonify(get_game_state())
+
+
+@app.route('/api/action', methods=['POST'])
+def api_action():
+    data = request.get_json()
+    action = data.get('action')
     try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+        if action == 'move':
+            direction = data.get('direction', 'up')
+            d = {'up': (0, -1), 'down': (0, 1), 'left': (-1, 0), 'right': (1, 0)}
+            dx, dy = d.get(direction, (0, -1))
+            res = asyncio.run(engine.move_player(dx, dy))
+            if res == "NEXT_LEVEL":
+                engine.new_level(gen)
+        elif action == 'battle':
+            engine.handle_battle_action(data.get('type', 'ATTACK'))
+        elif action == 'event':
+            engine.handle_event_choice(data.get('choice', 'A'))
+        elif action == 'restart':
+            engine.__init__(ai)
+            engine.new_level(gen)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+    return jsonify(get_game_state())
+
+
+if __name__ == '__main__':
+    import webbrowser
+    print("Starting Gemini Rogue Web Server at http://127.0.0.1:5000")
+    webbrowser.open('http://127.0.0.1:5000')
+    app.run(debug=False, port=5000)

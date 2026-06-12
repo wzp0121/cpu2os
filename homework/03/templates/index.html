@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Rogue - Web Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0c0f12;
+            --panel-bg: #161b22;
+            --border-color: #30363d;
+            --accent-cyan: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+            --accent-purple: #bc8cff;
+            --text-color: #c9d1d9;
+            --text-dim: #8b949e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Noto Sans TC', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 2rem;
+            color: var(--accent-cyan);
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-dim);
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 遊戲面板與地圖 */
+        .game-panel {
+            background-color: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .display-settings {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-toggle {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-toggle:hover, .btn-toggle.active {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            background-color: rgba(88, 166, 255, 0.1);
+        }
+
+        /* 地圖渲染區 */
+        .map-container {
+            background-color: #05070a;
+            border: 2px solid #000;
+            border-radius: 6px;
+            padding: 15px;
+            overflow: auto;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 320px;
+        }
+
+        .map-grid {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 24px;
+            line-height: 1.1;
+            letter-spacing: 2px;
+            white-space: pre;
+            user-select: none;
+        }
+
+        /* 側邊欄 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .card-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            color: var(--accent-cyan);
+        }
+
+        /* 狀態列 */
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .hp-bar-container {
+            width: 100%;
+            background-color: #21262d;
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .hp-bar {
+            height: 100%;
+            background-color: var(--accent-green);
+            width: 100%;
+            transition: width 0.3s ease, background-color 0.3s;
+        }
+
+        /* 遊戲日誌 */
+        .logs-container {
+            height: 180px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-right: 5px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        .log-item {
+            padding: 4px 8px;
+            border-left: 3px solid var(--border-color);
+            background-color: rgba(255,255,255,0.02);
+            border-radius: 0 4px 4px 0;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .log-item.new-level { border-left-color: var(--accent-green); color: var(--accent-green); }
+        .log-item.battle-start { border-left-color: var(--accent-red); color: var(--accent-red); }
+        .log-item.battle-win { border-left-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .log-item.event-start { border-left-color: var(--accent-purple); color: var(--accent-purple); }
+        .log-item.damage-player { border-left-color: var(--accent-red); }
+        .log-item.damage-enemy { border-left-color: var(--accent-yellow); }
+
+        /* 覆蓋模態視窗 */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(12, 15, 18, 0.85);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background-color: var(--panel-bg);
+            border: 3px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 550px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+            text-align: center;
+        }
+
+        .overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        /* 戰鬥模態樣式 */
+        .battle-modal { border-color: var(--accent-red); }
+        .battle-title { color: var(--accent-red); text-shadow: 0 0 10px rgba(248, 81, 73, 0.4); }
+        
+        .enemy-health {
+            margin-bottom: 20px;
+        }
+        .enemy-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 6px;
+        }
+
+        .ai-bubble {
+            background-color: #0c0f12;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            font-style: italic;
+            position: relative;
+            text-align: left;
+            line-height: 1.5;
+            color: var(--accent-yellow);
+        }
+
+        .ai-bubble::before {
+            content: "AI 怪物對白";
+            display: block;
+            font-family: 'Share Tech Mono', monospace;
+            font-style: normal;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        /* 動作按鈕群組 */
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .btn-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .btn {
+            background-color: #21262d;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 12px 16px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background-color: #30363d;
+            border-color: var(--text-color);
+        }
+
+        .btn-attack {
+            background-color: rgba(248, 81, 73, 0.15);
+            border-color: var(--accent-red);
+            color: #ff7b72;
+        }
+        .btn-attack:hover {
+            background-color: rgba(248, 81, 73, 0.3);
+        }
+
+        .btn-defend {
+            background-color: rgba(88, 166, 255, 0.15);
+            border-color: var(--accent-cyan);
+            color: #79c0ff;
+        }
+        .btn-defend:hover {
+            background-color: rgba(88, 166, 255, 0.3);
+        }
+
+        .btn-potion {
+            background-color: rgba(63, 185, 80, 0.15);
+            border-color: var(--accent-green);
+            color: #56d364;
+        }
+        .btn-potion:hover {
+            background-color: rgba(63, 185, 80, 0.3);
+        }
+
+        /* 事件模態樣式 */
+        .event-modal { border-color: var(--accent-purple); }
+        .event-title { color: var(--accent-purple); text-shadow: 0 0 10px rgba(188, 140, 255, 0.4); }
+        .event-desc {
+            text-align: left;
+            line-height: 1.6;
+            background-color: #0c0f12;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+        }
+
+        .btn-option {
+            background-color: rgba(188, 140, 255, 0.1);
+            border-color: var(--accent-purple);
+            color: #d3b3ff;
+            text-align: left;
+            padding: 15px;
+        }
+
+        .btn-option:hover {
+            background-color: rgba(188, 140, 255, 0.25);
+        }
+
+        /* 遊戲結束模態樣式 */
+        .gameover-modal { border-color: var(--accent-red); background-color: #1a0808; }
+        .gameover-title { color: var(--accent-red); font-size: 2rem; animation: blink 1s infinite alternate; }
+        .btn-restart {
+            background-color: var(--accent-red);
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 1.1rem;
+            box-shadow: 0 0 15px rgba(248, 81, 73, 0.5);
+            margin-top: 15px;
+        }
+        .btn-restart:hover {
+            background-color: #ff7b72;
+            transform: translateY(-2px);
+        }
+
+        /* 移動虛擬按鍵（手機或滑鼠用） */
+        .controls-panel {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 8px;
+        }
+
+        .dpad-btn {
+            background-color: #21262d;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s;
+        }
+
+        .dpad-btn:active {
+            background-color: var(--accent-cyan);
+            color: black;
+        }
+
+        .dpad-empty {
+            pointer-events: none;
+            visibility: hidden;
+        }
+
+        /* 圖例 */
+        .legend {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            border-top: 1px solid var(--border-color);
+            padding-top: 10px;
+            width: 100%;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes blink {
+            from { opacity: 0.4; }
+            to { opacity: 1; }
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        .spinner {
+            border: 4px solid rgba(88, 166, 255, 0.1);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border-left-color: var(--accent-cyan);
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading-screen">
+        <div class="spinner"></div>
+        <div style="font-family: 'Press Start 2P', monospace; font-size: 0.85rem; color: var(--accent-cyan);">LOADING GEMINI ROGUE...</div>
+    </div>
+
+    <header>
+        <h1>GEMINI ROGUE</h1>
+        <div class="subtitle">AI-Driven Non-blocking Asynchronous Rogue-lite Game</div>
+    </header>
+
+    <div class="container">
+        <!-- 左邊：地圖面板 -->
+        <main class="game-panel">
+            <div class="map-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-family: 'Press Start 2P', monospace; font-size: 0.9rem; color: var(--accent-green);">MAP VIEW</span>
+                </div>
+                <div class="display-settings">
+                    <button id="mode-classic" class="btn-toggle active" onclick="setRenderMode('classic')">經典 👾</button>
+                    <button id="mode-emoji" class="btn-toggle" onclick="setRenderMode('emoji')">圖形 🎨</button>
+                </div>
+            </div>
+
+            <div class="map-container">
+                <div id="map-grid" class="map-grid"></div>
+            </div>
+
+            <div class="legend" id="map-legend">
+                <!-- Legend items will be populated by JS -->
+            </div>
+
+            <!-- 虛擬搖桿 -->
+            <div class="controls-panel">
+                <div class="dpad">
+                    <button class="dpad-empty"></button>
+                    <button class="dpad-btn" onclick="sendAction('move', {direction: 'up'})">▲</button>
+                    <button class="dpad-empty"></button>
+                    <button class="dpad-btn" onclick="sendAction('move', {direction: 'left'})">◀</button>
+                    <button class="dpad-btn" style="font-size: 0.8rem; background-color: #161b22; pointer-events: none;">移動</button>
+                    <button class="dpad-btn" onclick="sendAction('move', {direction: 'right'})">▶</button>
+                    <button class="dpad-empty"></button>
+                    <button class="dpad-btn" onclick="sendAction('move', {direction: 'down'})">▼</button>
+                    <button class="dpad-empty"></button>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 5px;">你也可以使用鍵盤的 W/A/S/D 或 ◀/▲/▼/▶ 方向鍵移動</div>
+            </div>
+        </main>
+
+        <!-- 右邊：資訊與日誌 -->
+        <aside class="sidebar">
+            <!-- 玩家狀態 -->
+            <section class="card">
+                <div class="card-title">CHARACTER STATUS</div>
+                <div class="stat-row">
+                    <span class="stat-label">勇者名稱:</span>
+                    <span class="stat-value" id="player-name" style="color: var(--accent-cyan);">勇者</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">當前層數:</span>
+                    <span class="stat-value" id="game-level">B1</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">生命值 HP:</span>
+                    <span class="stat-value" id="player-hp-text">100/100</span>
+                </div>
+                <div class="hp-bar-container">
+                    <div id="player-hp-bar" class="hp-bar"></div>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">總攻擊力:</span>
+                    <span class="stat-value" id="player-atk" style="color: #ff7b72;">15</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">武器裝備:</span>
+                    <span class="stat-value" id="player-weapon" style="color: var(--accent-yellow);">無</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">防禦減傷:</span>
+                    <span class="stat-value" id="player-def" style="color: var(--accent-cyan);">5</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">防具裝備:</span>
+                    <span class="stat-value" id="player-armor" style="color: var(--accent-yellow);">無</span>
+                </div>
+                <div class="stat-row" style="margin-bottom: 0;">
+                    <span class="stat-label">藥水數量:</span>
+                    <span class="stat-value" id="player-potions" style="color: var(--accent-green);">3 🧪</span>
+                </div>
+            </section>
+
+            <!-- 歷史日誌 -->
+            <section class="card" style="flex-grow: 1; display: flex; flex-direction: column;">
+                <div class="card-title">ADVENTURE LOGS</div>
+                <div id="logs-container" class="logs-container">
+                    <!-- Logs populated by JS -->
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <!-- 戰鬥模態視窗 -->
+    <div id="overlay-battle" class="overlay">
+        <div class="modal battle-modal">
+            <div class="modal-title battle-title">⚔️ 遭遇戰鬥 ⚔️</div>
+            <div class="enemy-health">
+                <div class="enemy-name" id="enemy-name">地底哥布林</div>
+                <div class="hp-bar-container" style="height: 10px; margin-bottom: 5px;">
+                    <div id="enemy-hp-bar" class="hp-bar" style="background-color: var(--accent-red);"></div>
+                </div>
+                <div id="enemy-hp-text" style="font-family: 'Share Tech Mono', monospace; font-size: 0.85rem; color: var(--text-dim);">HP: 30/30</div>
+            </div>
+            
+            <div class="ai-bubble" id="battle-dialogue">
+                「嘶嘶... 勇者！受死吧！」
+            </div>
+
+            <div class="btn-group">
+                <div class="btn-row">
+                    <button class="btn btn-attack" onclick="sendAction('battle', {type: 'ATTACK'})">
+                        <span>⚔️ 攻擊</span> <span style="font-size:0.75rem; color:var(--text-dim); font-weight:normal;">[1]</span>
+                    </button>
+                    <button class="btn btn-defend" onclick="sendAction('battle', {type: 'DEFEND'})">
+                        <span>🛡️ 防禦</span> <span style="font-size:0.75rem; color:var(--text-dim); font-weight:normal;">[2]</span>
+                    </button>
+                    <button class="btn btn-potion" onclick="sendAction('battle', {type: 'POTION'})">
+                        <span>🧪 藥水</span> <span style="font-size:0.75rem; color:var(--text-dim); font-weight:normal;">[3]</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 寶箱/事件模態視窗 -->
+    <div id="overlay-event" class="overlay">
+        <div class="modal event-modal">
+            <div class="modal-title event-title">✨ 神秘事件 ✨</div>
+            <div class="event-desc" id="event-desc">
+                前方散發出幽暗的紫色光芒，一個滿布荊棘的黃金祭壇靜靜放置在地牢深處...
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-option" onclick="sendAction('event', {choice: 'A'})" id="btn-opt-a">
+                    A. 大膽碰觸祭壇 [A]
+                </button>
+                <button class="btn btn-option" style="border-color: var(--text-dim); color: var(--text-color);" onclick="sendAction('event', {choice: 'B'})" id="btn-opt-b">
+                    B. 謹慎離開 [B]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 遊戲結束模態視窗 -->
+    <div id="overlay-gameover" class="overlay">
+        <div class="modal gameover-modal">
+            <div class="modal-title gameover-title">💀 GAME OVER 💀</div>
+            <p style="margin-bottom: 20px; font-size: 1.1rem; line-height: 1.6;">勇者，你的旅途在此終結。<br>希望你的英魂能在下一次地牢探索中走得更遠！</p>
+            <button class="btn btn-restart" onclick="sendAction('restart')" style="width: 100%;">
+                🔄 重新開始旅程
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let renderMode = localStorage.getItem('rogueRenderMode') || 'classic'; // 'classic' or 'emoji'
+        let currentGameState = null;
+
+        // 色彩定義 (用於 classic 渲染)
+        const colorsClass = {
+            '#': 'color: #8b949e; font-weight: bold;', // 牆壁
+            '.': 'color: #30363d;', // 地板
+            'P': 'color: #58a6ff; font-weight: bold; text-shadow: 0 0 5px #58a6ff;', // 玩家
+            'M': 'color: #f85149; font-weight: bold; text-shadow: 0 0 5px #f85149;', // 怪物
+            'B': 'color: #d29922; font-weight: bold; text-shadow: 0 0 5px #d29922;', // 寶箱
+            '>': 'color: #3fb950; font-weight: bold; text-shadow: 0 0 5px #3fb950;', // 樓梯
+        };
+
+        const emojiMapping = {
+            '#': '🧱', // 牆壁
+            '.': '░',  // 地板 (也可以用 "·" 或 "  ")
+            'P': '🧙', // 玩家
+            'M': '👹', // 怪物
+            'B': '📦', // 寶箱
+            '>': '🪜', // 樓梯
+        };
+
+        // 頁面加載
+        window.addEventListener('DOMContentLoaded', async () => {
+            setRenderMode(renderMode);
+            await fetchGameState();
+            document.getElementById('loading').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 500);
+        });
+
+        // 設定渲染模式
+        function setRenderMode(mode) {
+            renderMode = mode;
+            localStorage.setItem('rogueRenderMode', mode);
+            
+            document.getElementById('mode-classic').classList.toggle('active', mode === 'classic');
+            document.getElementById('mode-emoji').classList.toggle('active', mode === 'emoji');
+            
+            updateLegend();
+            if (currentGameState) {
+                renderMap(currentGameState.map);
+            }
+        }
+
+        // 更新圖例顯示
+        function updateLegend() {
+            const legend = document.getElementById('map-legend');
+            if (renderMode === 'classic') {
+                legend.innerHTML = `
+                    <div class="legend-item"><span style="${colorsClass['#']}">#</span> 牆壁</div>
+                    <div class="legend-item"><span style="${colorsClass['.']}">.</span> 通道</div>
+                    <div class="legend-item"><span style="${colorsClass['P']}">P</span> 玩家</div>
+                    <div class="legend-item"><span style="${colorsClass['M']}">M</span> 怪物</div>
+                    <div class="legend-item"><span style="${colorsClass['B']}">B</span> 寶箱</div>
+                    <div class="legend-item"><span style="${colorsClass['>']}">&gt;</span> 下一層樓梯</div>
+                `;
+            } else {
+                legend.innerHTML = `
+                    <div class="legend-item"><span>${emojiMapping['#']}</span> 牆壁</div>
+                    <div class="legend-item"><span>${emojiMapping['.']}</span> 通道</div>
+                    <div class="legend-item"><span>${emojiMapping['P']}</span> 玩家</div>
+                    <div class="legend-item"><span>${emojiMapping['M']}</span> 怪物</div>
+                    <div class="legend-item"><span>${emojiMapping['B']}</span> 寶箱</div>
+                    <div class="legend-item"><span>${emojiMapping['>']}</span> 下一層樓梯</div>
+                `;
+            }
+        }
+
+        // 獲取遊戲狀態
+        async function fetchGameState() {
+            try {
+                const response = await fetch('/api/state');
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                console.error('Error fetching game state:', error);
+            }
+        }
+
+        // 送出玩家動作
+        async function sendAction(action, payload = {}) {
+            try {
+                const response = await fetch('/api/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, ...payload })
+                });
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                console.error('Error sending action:', error);
+            }
+        }
+
+        // 更新整個遊戲 UI
+        function updateUI(state) {
+            currentGameState = state;
+
+            // 1. 渲染地圖
+            renderMap(state.map);
+
+            // 2. 更新狀態卡片
+            document.getElementById('player-name').innerText = state.player.name;
+            document.getElementById('game-level').innerText = 'B' + state.level;
+            document.getElementById('player-hp-text').innerText = `${state.player.hp}/${state.player.max_hp}`;
+            
+            const hpPct = (state.player.hp / state.player.max_hp) * 100;
+            const hpBar = document.getElementById('player-hp-bar');
+            hpBar.style.width = hpPct + '%';
+            if (hpPct > 50) {
+                hpBar.style.backgroundColor = 'var(--accent-green)';
+            } else if (hpPct > 20) {
+                hpBar.style.backgroundColor = 'var(--accent-yellow)';
+            } else {
+                hpBar.style.backgroundColor = 'var(--accent-red)';
+            }
+
+            document.getElementById('player-atk').innerText = `${state.player.total_atk}`;
+            document.getElementById('player-weapon').innerText = state.player.weapon;
+            document.getElementById('player-def').innerText = `${state.player.defense}`;
+            document.getElementById('player-armor').innerText = state.player.armor;
+            document.getElementById('player-potions').innerText = `${state.player.potions} 🧪`;
+
+            // 3. 更新冒險日誌
+            renderLogs(state.logs);
+
+            // 4. 處理彈窗狀態
+            // 隱藏所有彈窗
+            document.getElementById('overlay-battle').classList.remove('active');
+            document.getElementById('overlay-event').classList.remove('active');
+            document.getElementById('overlay-gameover').classList.remove('active');
+
+            if (state.state === 'BATTLE') {
+                const b = state.battle;
+                document.getElementById('enemy-name').innerText = b.name;
+                document.getElementById('enemy-hp-text').innerText = `HP: ${b.hp}/${b.max_hp}`;
+                document.getElementById('enemy-hp-bar').style.width = ((b.hp / b.max_hp) * 100) + '%';
+                document.getElementById('battle-dialogue').innerText = b.dialogue || '（嘶嘶聲...）';
+                document.getElementById('overlay-battle').classList.add('active');
+            } else if (state.state === 'EVENT') {
+                const ev = state.event;
+                document.getElementById('event-desc').innerText = ev.desc;
+                document.getElementById('btn-opt-a').innerHTML = `A. ${ev.opt_a} <span style="font-size:0.75rem; opacity:0.6;">[A]</span>`;
+                document.getElementById('btn-opt-b').innerHTML = `B. ${ev.opt_b} <span style="font-size:0.75rem; opacity:0.6;">[B]</span>`;
+                document.getElementById('overlay-event').classList.add('active');
+            } else if (state.state === 'GAMEOVER') {
+                document.getElementById('overlay-gameover').classList.add('active');
+            }
+        }
+
+        // 渲染地圖數據
+        function renderMap(mapData) {
+            const mapGrid = document.getElementById('map-grid');
+            if (!mapData || mapData.length === 0) {
+                mapGrid.innerHTML = '地圖載入中...';
+                return;
+            }
+
+            let html = '';
+            for (let y = 0; y < mapData.length; y++) {
+                for (let x = 0; x < mapData[y].length; x++) {
+                    const char = mapData[y][x];
+                    if (renderMode === 'classic') {
+                        const style = colorsClass[char] || '';
+                        html += `<span style="${style}">${char}</span>`;
+                    } else {
+                        const emoji = emojiMapping[char] || char;
+                        // 特殊調整以保持等寬
+                        if (char === '.' || char === ' ') {
+                            html += `<span style="opacity: 0.25; font-size: 14px; display: inline-block; width: 24px; text-align: center;">·</span>`;
+                        } else {
+                            html += `<span style="display: inline-block; width: 24px; text-align: center;">${emoji}</span>`;
+                        }
+                    }
+                }
+                html += '\n';
+            }
+            mapGrid.innerHTML = html;
+        }
+
+        // 渲染日誌
+        function renderLogs(logs) {
+            const logsContainer = document.getElementById('logs-container');
+            const wasAtBottom = logsContainer.scrollHeight - logsContainer.clientHeight <= logsContainer.scrollTop + 20;
+            
+            logsContainer.innerHTML = '';
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'log-item';
+                item.innerText = ' > ' + log;
+                
+                // 動態分類上色
+                if (log.includes('進入第')) item.classList.add('new-level');
+                else if (log.includes('遭遇')) item.classList.add('battle-start');
+                else if (log.includes('擊敗了')) item.classList.add('battle-win');
+                else if (log.includes('神秘事件') || log.includes('獲得') || log.includes('神蹟')) item.classList.add('event-start');
+                else if (log.includes('對你造成')) item.classList.add('damage-player');
+                else if (log.includes('你對')) item.classList.add('damage-enemy');
+                
+                logsContainer.appendChild(item);
+            });
+
+            // 自動滾動至最下方
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        // 鍵盤操控事件
+        document.addEventListener('keydown', (e) => {
+            if (!currentGameState) return;
+
+            const key = e.key.toLowerCase();
+            const state = currentGameState.state;
+
+            if (state === 'EXPLORE') {
+                if (e.key === 'ArrowUp' || key === 'w') {
+                    e.preventDefault();
+                    sendAction('move', { direction: 'up' });
+                } else if (e.key === 'ArrowDown' || key === 's') {
+                    e.preventDefault();
+                    sendAction('move', { direction: 'down' });
+                } else if (e.key === 'ArrowLeft' || key === 'a') {
+                    e.preventDefault();
+                    sendAction('move', { direction: 'left' });
+                } else if (e.key === 'ArrowRight' || key === 'd') {
+                    e.preventDefault();
+                    sendAction('move', { direction: 'right' });
+                }
+            } else if (state === 'BATTLE') {
+                if (key === '1') {
+                    sendAction('battle', { type: 'ATTACK' });
+                } else if (key === '2') {
+                    sendAction('battle', { type: 'DEFEND' });
+                } else if (key === '3') {
+                    sendAction('battle', { type: 'POTION' });
+                }
+            } else if (state === 'EVENT') {
+                if (key === 'a') {
+                    sendAction('event', { choice: 'A' });
+                } else if (key === 'b') {
+                    sendAction('event', { choice: 'B' });
+                }
+            } else if (state === 'GAMEOVER') {
+                // 任意鍵重新開始
+                sendAction('restart');
+            }
+        });
+    </script>
+</body>
+</html>
